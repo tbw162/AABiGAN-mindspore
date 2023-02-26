@@ -113,15 +113,15 @@ def encoder_forward(img_pos,img_neg):#编码器损失计算
     e_loss = adversarial_loss(discriminator(img_pos,z_out_real)[0],c*valid)+ adversarial_loss(discriminator(img_neg,z_out_neg)[0], c*(ops.ones((img_neg.shape[0], 1),mindspore.float32)))#+(1/3)*cycle_loss
     return e_loss, z_out_real, z_out_neg
 grad_discriminator_fn = ops.value_and_grad(discriminator_forward, None,
-                                           optimizer_D.parameters)
+                                           optimizer_D.parameters,has_aux=False)
 
-grad_generator_fn = ops.value_and_grad(generator_forward,None,optimizer_G.parameters)
-grad_encoder_fn = ops.value_and_grad(encoder_forward,None,optimizer_E.parameters)
+grad_generator_fn = ops.value_and_grad(generator_forward,None,optimizer_G.parameters,has_aux=True)
+grad_encoder_fn = ops.value_and_grad(encoder_forward,None,optimizer_E.parameters,has_aux=True)
 train_pos = train_pos.create_tuple_iterator()
 train_neg = train_neg.create_tuple_iterator()
 
 from testing_ms import test_eva
-eva_dic= test_eva(generator,encoder,discriminator,0,val_loader,test_loader,opt)
+#eva_dic= test_eva(generator,encoder,discriminator,0,val_loader,test_loader,opt)
 for epoch in range(opt.n_epochs):
     start = time.time()
     i = 0
@@ -166,7 +166,9 @@ for epoch in range(opt.n_epochs):
         gen_imgs_fake = gen[img_pos.shape[0]:]
       
         
-        
+        d_loss, d_grads = grad_discriminator_fn(img_pos,gen_imgs_fake,img_neg,z_out_real,z_out_fake,z_out_neg,gen_imgs_real,valid)
+        optimizer_D(d_grads)
+    
         #print(img_pos.shape)
         
         
@@ -182,9 +184,7 @@ for epoch in range(opt.n_epochs):
         
         
         
-        d_loss, d_grads = grad_discriminator_fn(img_pos,gen_imgs_fake,img_neg,z_out_real,z_out_fake,z_out_neg,gen_imgs_real,valid)
-        optimizer_D(d_grads)
-    
+        
 
         
         #cycle_loss = adversarial_loss(discriminator(img_pos,img_pos,'xx')[0],c*valid)+adversarial_loss(discriminator(img_pos,gen_imgs_real,'xx')[0],c*valid)+adversarial_loss(discriminator(img_neg,img_neg,'xx')[0],c*(ops.ones([img_neg.size(0), 1]),mindspore.float32))
